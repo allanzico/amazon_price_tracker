@@ -11,12 +11,11 @@ page = requests.get(URL, headers=headers)
 soup = BeautifulSoup(page.content, 'html.parser')
 
 def check_price():
-    try:
-        title = soup.find(id="productTitle").get_text()
-        price = soup.find(id="priceblock_dealprice").get_text()
-    except:
-        print('ERROR')
+
+    title = soup.find(id="productTitle").get_text()
+    price = soup.find(id="priceblock_dealprice").get_text()
     converted_price = float(price[1:])
+    
     if(converted_price > 51.00):
         send_mail()
 

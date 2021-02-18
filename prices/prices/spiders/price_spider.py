@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import smtplib
+import  credentials
 
 URL = 'https://www.amazon.de/-/en/Labists-Raspberry-Ultimate-Class10-switching/dp/B07W7Q6ZC9/ref=sr_1_4?dchild=1&keywords=raspberry+pi&qid=1613641182&s=ce-de&sr=1-4'
 headers = {
@@ -22,13 +23,13 @@ def send_mail():
     server.starttls()
     server.ehlo()
 
-    server.login('akanyijuka.spiders@gmail.com','@P455word')
+    server.login(credentials.email_from, credentials.password)
     subject = "PRICE REDUCED"
     body = 'check the link https://www.amazon.de/-/en/Labists-Raspberry-Ultimate-Class10-switching/dp/B07W7Q6ZC9/ref=sr_1_4?dchild=1&keywords=raspberry+pi&qid=1613641182&s=ce-de&sr=1-4 '
     msg = f"Subject: {subject}\n\n{body}"
     server.sendmail(
-        # 'akanyijuka0@gmail.com',
-        'akanyijuka@gmail.com',
+        credentials.email_from,
+        credentials.email_to,
         msg
     )
 

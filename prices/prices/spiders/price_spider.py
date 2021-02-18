@@ -14,9 +14,9 @@ def check_price():
     try:
         title = soup.find(id="productTitle").get_text()
         price = soup.find(id="priceblock_dealprice").get_text()
-        converted_price = float(price[1:])
     except:
         print('ERROR')
+    converted_price = float(price[1:])
     if(converted_price > 51.00):
         send_mail()
 

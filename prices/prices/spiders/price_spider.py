@@ -1,14 +1,20 @@
 import requests
 from bs4 import BeautifulSoup
 from requests_html import HTMLSession
+import pandas as pd
 import smtplib
 import credentials
 
 # search term separated with a + sign for two words (samsung+tv)
 searchTerm = 'tv'
 session = HTMLSession()
-
-url = 'https://www.amazon.de/s?k=tv&i=electronics&ref=nb_sb_noss'
+deals_list = []
+url = f'https://www.amazon.de/s?k={searchTerm}&i=electronics&ref=nb_sb_noss'
+headers = {
+    "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0'
+}
+page = requests.get(url, headers=headers)
+soup = BeautifulSoup(page.content, 'html.parser')
 
 
 def get_data(url):
@@ -25,12 +31,45 @@ def get_deals(soup):
         short_title = product.find('a', {'class': 'a-link-normal a-text-normal'}).text.strip()[:25]
         link = product.find('a', {'class': 'a-link-normal a-text-normal'})['href']
         try:
-            sale_price = product.find_all('span', {'class': 'a-offscreen'})[0].text.strip()
-            old_price = product.find_all('span', {'class': 'a-offscreen'})[1].text.strip()
+            sale_price = float(
+                product.find_all('span', {'class': 'a-offscreen'})[0].text.replace('€', '').replace(',', '').strip())
+            old_price = float(
+                product.find_all('span', {'class': 'a-offscreen'})[1].text.replace('€', '').replace(',', '').strip())
         except:
-            old_price = product.find('span', {'class': 'a-offscreen'}).text.strip()
+            old_price = float(
+                product.find('span', {'class': 'a-offscreen'}).text.replace('€', '').replace(',', '').strip())
+        try:
+            reviews = float(product.find('span', {'class': 'a-size-base'}).text.strip())
+        except:
+            reviews = 0
 
-        print(sale_price)
+        sale_item = {
+            'title': title,
+            'short_title': short_title,
+            'link': link,
+            'sale_price': sale_price,
+            'old_price': old_price
+        }
+        deals_list.append(sale_item)
+    return
+
+def get_next_page(soup):
+    pages = soup.find('ul', {'class': 'a-pagination'})
+    if not pages.find('li', {'class': 'a-disabled a-last'}):
+        url = 'https://www.amazon.de/' + str(pages.find('li', {'class': 'a-last'}).find('a')['href'])
+        return url
+    else:
+        return
+
+
+while True:
+    soup = get_data(url)
+    get_deals(soup)
+    url = get_next_page(soup)
+    if not url:
+        break
+    else:
+        print(len(deals_list))
 
 # headers = {
 #     "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0'

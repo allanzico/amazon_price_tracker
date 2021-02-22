@@ -74,9 +74,11 @@ class AmazonAPI:
         title = self.get_title(),
         price = self.get_price()
 
+        return None
+
     def get_title(self):
         try:
-            return self.driver.find_element_by_id('productTitle').text
+            return self.driver.find_elements_by_xpath('//span[contains (@id, "productTitle")]')
         except Exception as e:
             print(e)
             print(f"Can't find product title....")
@@ -86,7 +88,7 @@ class AmazonAPI:
        return '999'
 
     def shorten_url(self, asin):
-        return self.base_url + '/dp' + asin
+        return self.base_url + 'dp/' + asin
 
     def get_asins(self, links):
         return [self.get_asin(link) for link in links]

@@ -1,108 +1,106 @@
-import requests
-from bs4 import BeautifulSoup
-from requests_html import HTMLSession
-import pandas as pd
-import smtplib
-import credentials
+import time
 
-# search term separated with a + sign for two words (samsung+tv)
-searchTerm = 'tv'
-session = HTMLSession()
-deals_list = []
-url = f'https://www.amazon.de/s?k={searchTerm}&i=electronics&ref=nb_sb_noss'
-headers = {
-    "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0'
-}
-page = requests.get(url, headers=headers)
-soup = BeautifulSoup(page.content, 'html.parser')
+from selenium.webdriver.common.keys import Keys
 
-
-def get_data(url):
-    r = session.get(url)
-    r.html.render(sleep=1)
-    soup = BeautifulSoup(r.html.html, 'html.parser')
-    return soup
+from amazon_config import (
+    get_web_driver_options,
+    get_chrome_web_driver,
+    set_browser_as_incognito,
+    set_ignore_certificate_error,
+    DIRECTORY,
+    NAME, CURRENCY,
+    FILTERS,
+    BASE_URL,
+    MAX_PRICE,
+    MIN_PRICE
+)
 
 
-def get_deals(soup):
-    products = soup.find_all('div', {'data-component-type': 's-search-result'})
-    for product in products:
-        title = product.find('a', {'class': 'a-link-normal a-text-normal'}).text.strip()
-        short_title = product.find('a', {'class': 'a-link-normal a-text-normal'}).text.strip()[:25]
-        link = product.find('a', {'class': 'a-link-normal a-text-normal'})['href']
+class AmazonAPI:
+    def __init__(self, search_term, filters, base_url, currency):
+        self.base_url = base_url
+        self.search_term = search_term
+        options = get_web_driver_options()
+        set_browser_as_incognito(options)
+        set_ignore_certificate_error(options)
+        self.driver = get_chrome_web_driver(options)
+        self.currency = currency
+        self.price_filter = f"&rh=p_36%3A{filters['min']}00-{filters['max']}00"
+
+    def run(self):
+        print("Running script........")
+        print(f"Searching for {self.search_term}....")
+        links = self.get_products_links()
+        time.sleep(1)
+        if not links:
+            print("Stopped script")
+            return
+        print(f"Got {len(links)} links to products")
+        products = self.get_products_info(links)
+        self.driver.quit()
+
+    def get_products_links(self):
+        links = []
+        self.driver.get(self.base_url)
+        element = self.driver.find_element_by_xpath('//*[@id="twotabsearchtextbox"]')
+        element.send_keys(self.search_term)
+        element.send_keys(Keys.ENTER)
+        time.sleep(2)
+        self.driver.get(f'{self.driver.current_url}{self.price_filter}')
+        time.sleep(2)
+        result_list = self.driver.find_elements_by_class_name('s-result-list')
+        
         try:
-            sale_price = float(
-                product.find_all('span', {'class': 'a-offscreen'})[0].text.replace('€', '').replace(',', '').strip())
-            old_price = float(
-                product.find_all('span', {'class': 'a-offscreen'})[1].text.replace('€', '').replace(',', '').strip())
-        except:
-            old_price = float(
-                product.find('span', {'class': 'a-offscreen'}).text.replace('€', '').replace(',', '').strip())
+            results = result_list[0].find_element_by_xpath(
+                '//html/body/div[1]/div[2]/div[1]/div[2]/div/span[3]/div[2]/div[7]/div/span/div/div/div[2]')
+            links = [link.get_attribute('href') for link in results]
+            return links
+        except Exception as e:
+            print("No results....")
+            print(e)
+            return links
+
+    def get_products_info(self, links):
+        asins = self.get_asins(links)
+        products = []
+        for asin in asins:
+            product = self.get_single_product_info(asin)
+
+    def get_single_product_info(self, asin):
+        print(f"product ID: {asin} - getting data..")
+        product_short_url = self.shorten_url(asin)
+        self.driver.get(f'{product_short_url}?language=en_GB')
+        time.sleep(2)
+        title = self.get_title(),
+        price = self.get_price()
+
+    def get_title(self):
         try:
-            reviews = float(product.find('span', {'class': 'a-size-base'}).text.strip())
-        except:
-            reviews = 0
+            return self.driver.find_element_by_id('productTitle').text
+        except Exception as e:
+            print(e)
+            print(f"Can't find product title....")
+            return None
 
-        sale_item = {
-            'title': title,
-            'short_title': short_title,
-            'link': link,
-            'sale_price': sale_price,
-            'old_price': old_price
-        }
-        deals_list.append(sale_item)
-    return
+    def get_price(self):
+       return '999'
 
-def get_next_page(soup):
-    pages = soup.find('ul', {'class': 'a-pagination'})
-    if not pages.find('li', {'class': 'a-disabled a-last'}):
-        url = 'https://www.amazon.de/' + str(pages.find('li', {'class': 'a-last'}).find('a')['href'])
-        return url
-    else:
-        return
+    def shorten_url(self, asin):
+        return self.base_url + '/dp' + asin
+
+    def get_asins(self, links):
+        return [self.get_asin(link) for link in links]
+
+    def get_asin(self, product_link):
+        return product_link[product_link.find('/dp/') + 4:product_link.find('/ref')]
 
 
-while True:
-    soup = get_data(url)
-    get_deals(soup)
-    url = get_next_page(soup)
-    if not url:
-        break
-    else:
-        print(len(deals_list))
+class GenerateReport:
+    def __init__(self):
+        pass
 
-# headers = {
-#     "User-Agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0'
-# }
-# page = requests.get(url, headers=headers)
-# soup = BeautifulSoup(page.content, 'html.parser')
 
-# def check_price():
-#
-#     title = soup.find(id="productTitle").get_text()
-#     price = soup.find(id="priceblock_dealprice").get_text()
-#     converted_price = float(price[1:])
-#
-#     if(converted_price > 51.00):
-#         send_mail()
-#
-# def send_mail():
-#     server = smtplib.SMTP('smtp.gmail.com', 587)
-#     server.ehlo()
-#     server.starttls()
-#     server.ehlo()
-#
-#     server.login(credentials.email_from, credentials.password)
-#     subject = "PRICE REDUCED"
-#     body = 'check the link https://www.amazon.de/-/en/Labists-Raspberry-Ultimate-Class10-switching/dp/B07W7Q6ZC9/ref=sr_1_4?dchild=1&keywords=raspberry+pi&qid=1613641182&s=ce-de&sr=1-4 '
-#     msg = f"Subject: {subject}\n\n{body}"
-#     server.sendmail(
-#         credentials.email_from,
-#         credentials.email_to,
-#         msg
-#     )
-#
-#     print('EMAIL SENT')
-#     server.quit()
-
-# check_price()
+if __name__ == '__main__':
+    print('HEYYYYY!!')
+    amazon = AmazonAPI(NAME, FILTERS, BASE_URL, CURRENCY)
+    amazon.run()

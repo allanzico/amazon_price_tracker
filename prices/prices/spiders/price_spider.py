@@ -49,10 +49,10 @@ class AmazonAPI:
         self.driver.get(f'{self.driver.current_url}{self.price_filter}')
         time.sleep(2)
         result_list = self.driver.find_elements_by_class_name('s-result-list')
-        
+
         try:
-            results = result_list[0].find_element_by_xpath(
-                '//html/body/div[1]/div[2]/div[1]/div[2]/div/span[3]/div[2]/div[7]/div/span/div/div/div[2]')
+            results = result_list[0].find_elements_by_xpath(
+                '//div/span/div/div/div[2]/div[2]/div/div[1]/div/div/div[1]/h2/a')
             links = [link.get_attribute('href') for link in results]
             return links
         except Exception as e:

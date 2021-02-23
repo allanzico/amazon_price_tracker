@@ -1,5 +1,6 @@
 import time
 
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
 from amazon_config import (
@@ -28,8 +29,6 @@ class AmazonAPI:
         self.price_filter = f"&rh=p_36%3A{filters['min']}00-{filters['max']}00"
 
     def run(self):
-        print("Running script........")
-        print(f"Searching for {self.search_term}....")
         links = self.get_products_links()
         time.sleep(1)
         if not links:
@@ -38,6 +37,7 @@ class AmazonAPI:
         print(f"Got {len(links)} links to products")
         products = self.get_products_info(links)
         self.driver.quit()
+        return products
 
     def get_products_links(self):
         links = []
@@ -65,6 +65,9 @@ class AmazonAPI:
         products = []
         for asin in asins:
             product = self.get_single_product_info(asin)
+            if product:
+                products.append(product)
+        return products
 
     def get_single_product_info(self, asin):
         print(f"product ID: {asin} - getting data..")
@@ -72,20 +75,69 @@ class AmazonAPI:
         self.driver.get(f'{product_short_url}?language=en_GB')
         time.sleep(2)
         title = self.get_title(),
-        price = self.get_price()
-
+        price = self.get_price(),
+        # old_price = self.get_old_price()
+        if title and price:
+            product_info = {
+                'asin': asin,
+                'url': product_short_url,
+                'title': title,
+                'price': price,
+                # 'old_price': old_price
+            }
+            return product_info
         return None
 
     def get_title(self):
         try:
-            return self.driver.find_elements_by_xpath('//span[contains (@id, "productTitle")]')
+            return self.driver.find_element_by_id('productTitle').text
         except Exception as e:
             print(e)
             print(f"Can't find product title....")
             return None
 
     def get_price(self):
-       return '999'
+        price = None
+        try:
+            price = self.driver.find_element_by_id('priceblock_ourprice').text
+            price = self.convert_price(price)
+        except NoSuchElementException:
+            try:
+                availability = self.driver.find_element_by_id('availability').text
+                if "Available" in availability:
+                    price = self.driver.find_elements_by_class_name('olp-padding-right').text
+                    price = price[price.find(self.currency):]
+                    price = self.convert_price(price)
+            except Exception as e:
+                print(e)
+                print(f"Can't get price product - {self.driver.current_url}")
+                return None
+        except Exception as e:
+            print(e)
+            print(f"Can't get price product - {self.driver.current_url}")
+            return None
+        return price
+
+    # def get_old_price(self):
+    #     old_price = None
+    #     try:
+    #         old_price = self.driver.find_elements_by_class_name('priceBlockStrikePriceString a-text-strike').text
+    #     except NoSuchElementException:
+    #         try:
+    #             discount_price = old_price
+    #             if discount_price:
+    #                 old_price = self.convert_price(old_price)
+    #         except:
+    #             old_price = self.get_price()
+    #     return old_price
+
+    def convert_price(self, price):
+        price = price.split(self.currency)[1]
+        try:
+            price = price.split("\n")[0] + "." + price.split("\n")[1]
+        except:
+            Exception()
+        return float(price)
 
     def shorten_url(self, asin):
         return self.base_url + 'dp/' + asin
@@ -93,7 +145,8 @@ class AmazonAPI:
     def get_asins(self, links):
         return [self.get_asin(link) for link in links]
 
-    def get_asin(self, product_link):
+    @staticmethod
+    def get_asin(product_link):
         return product_link[product_link.find('/dp/') + 4:product_link.find('/ref')]
 
 
@@ -103,6 +156,6 @@ class GenerateReport:
 
 
 if __name__ == '__main__':
-    print('HEYYYYY!!')
     amazon = AmazonAPI(NAME, FILTERS, BASE_URL, CURRENCY)
-    amazon.run()
+    data = amazon.run()
+    print(data)

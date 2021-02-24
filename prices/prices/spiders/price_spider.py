@@ -76,14 +76,16 @@ class AmazonAPI:
         time.sleep(2)
         title = self.get_title(),
         price = self.get_price(),
-        # old_price = self.get_old_price()
+        old_price = self.get_old_price()
+        discount = self.calculate_discount()
         if title and price:
             product_info = {
                 'asin': asin,
                 'url': product_short_url,
                 'title': title,
                 'price': price,
-                # 'old_price': old_price
+                'old_price': old_price,
+                'discount': discount
             }
             return product_info
         return None
@@ -99,7 +101,7 @@ class AmazonAPI:
     def get_price(self):
         price = None
         try:
-            price = self.driver.find_element_by_id('priceblock_ourprice').text
+            price = self.driver.find_element_by_xpath('//*[@id="priceblock_ourprice"]').text
             price = self.convert_price(price)
         except NoSuchElementException:
             try:
@@ -118,18 +120,34 @@ class AmazonAPI:
             return None
         return price
 
-    # def get_old_price(self):
-    #     old_price = None
-    #     try:
-    #         old_price = self.driver.find_elements_by_class_name('priceBlockStrikePriceString a-text-strike').text
-    #     except NoSuchElementException:
-    #         try:
-    #             discount_price = old_price
-    #             if discount_price:
-    #                 old_price = self.convert_price(old_price)
-    #         except:
-    #             old_price = self.get_price()
-    #     return old_price
+    def get_old_price(self):
+
+        try:
+            old_price = self.driver.find_element_by_xpath('//*[@id="price"]/table/tbody/tr[1]/td[2]/span[1]').text
+            old_price = self.convert_price(old_price)
+        except NoSuchElementException:
+            try:
+                discount_price = old_price
+                if discount_price:
+                    old_price = self.convert_price(old_price)
+            except:
+                old_price = self.get_price()
+        return old_price
+
+    def calculate_discount(self):
+        # price = self.get_price()
+        # old_price = self.get_old_price()
+        # percent_price = old_price-price
+        discount = None
+        return discount
+
+    def convert_old_price(self, old_price):
+        old_price = old_price.split(self.currency)[1]
+        try:
+            old_price = old_price.split("\n")[0] + "." + old_price.split("\n")[1]
+        except:
+            Exception()
+        return float(old_price)
 
     def convert_price(self, price):
         price = price.split(self.currency)[1]
